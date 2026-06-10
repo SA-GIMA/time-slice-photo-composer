@@ -1,0 +1,815 @@
+
+<!doctype html>
+<meta charset="utf-8">
+<title>时间切片照片合成工具</title>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --color-background-primary:#ffffff;
+  --color-background-secondary:#f4f6f9;
+  --color-background-elevated:#ffffff;
+  --color-text-primary:#172033;
+  --color-text-secondary:#5d6b82;
+  --color-text-tertiary:#8893a5;
+  --color-text-danger:#c2410c;
+  --color-border-secondary:#cfd7e3;
+  --color-border-tertiary:#e2e8f0;
+  --border-radius-sm:5px;
+  --border-radius-md:7px;
+  --border-radius-lg:8px;
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+html, body { min-height:100%; background:#edf1f6; color:var(--color-text-primary); font-family:var(--font-sans); }
+button, input, select { font:inherit; }
+.sr-only { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0); }
+.app { display:flex; gap:0; min-height:100vh; background:var(--color-background-primary); }
+.sidebar { width:316px; min-width:316px; border-right:1px solid var(--color-border-tertiary); display:flex; flex-direction:column; overflow-y:auto; max-height:100vh; background:var(--color-background-elevated); }
+.section { border-bottom:1px solid var(--color-border-tertiary); padding:16px 18px; }
+.section-title { font-size:11px; font-weight:700; color:var(--color-text-secondary); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:12px; }
+.upload-zone { border:1px dashed var(--color-border-secondary); border-radius:var(--border-radius-lg); padding:16px 12px; text-align:center; cursor:pointer; color:var(--color-text-secondary); font-size:12px; line-height:1.55; transition:background 0.15s,border-color 0.15s,color 0.15s; background:#fafcff; }
+.upload-zone:hover { background:#f0f6ff; border-color:#7aa7f7; color:#2458b8; }
+.upload-zone i { font-size:22px; display:block; margin-bottom:6px; }
+.photo-list { display:flex; flex-direction:column; gap:3px; margin-top:8px; max-height:130px; overflow-y:auto; }
+.photo-item { display:flex; align-items:center; gap:7px; padding:5px 7px; border-radius:var(--border-radius-md); font-size:12px; color:var(--color-text-primary); background:var(--color-background-secondary); }
+.photo-item .idx { font-size:11px; color:var(--color-text-secondary); min-width:16px; text-align:center; }
+.photo-item .name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.photo-item .del { font-size:13px; color:var(--color-text-secondary); cursor:pointer; padding:0 2px; line-height:1; border:none; background:none; }
+.photo-item .del:hover { color:var(--color-text-danger,#c00); }
+.param-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:9px; }
+.param-row label { font-size:12px; color:var(--color-text-secondary); white-space:nowrap; }
+.param-row input[type=range] { flex:1; accent-color:#2563eb; }
+.param-val { font-size:12px; font-weight:600; min-width:42px; text-align:right; color:var(--color-text-primary); font-variant-numeric:tabular-nums; }
+.param-row select { font-size:12px; padding:6px 8px; border-radius:var(--border-radius-md); border:1px solid var(--color-border-secondary); background:var(--color-background-primary); color:var(--color-text-primary); flex:1; min-width:0; }
+.toggle-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+.toggle-row label { font-size:12px; color:var(--color-text-secondary); }
+.toggle { width:30px; height:17px; background:var(--color-border-secondary); border-radius:9px; position:relative; cursor:pointer; transition:background 0.2s; flex-shrink:0; border:none; }
+.toggle::after { content:''; position:absolute; width:13px; height:13px; background:var(--color-background-primary); border-radius:50%; top:2px; left:2px; transition:left 0.2s; }
+.toggle.on { background:#2563EB; }
+.toggle.on::after { left:15px; }
+.color-row { display:flex; align-items:center; gap:8px; margin-bottom:9px; }
+.color-row label { font-size:12px; color:var(--color-text-secondary); flex:1; }
+.color-row input[type=color] { width:28px; height:28px; border-radius:var(--border-radius-md); border:1px solid var(--color-border-secondary); padding:2px; cursor:pointer; background:none; }
+.mode-tabs { display:flex; gap:4px; margin-bottom:13px; }
+.mode-tab { flex:1; padding:7px 0; font-size:12px; font-weight:600; border-radius:var(--border-radius-md); border:1px solid var(--color-border-secondary); background:var(--color-background-primary); color:var(--color-text-secondary); cursor:pointer; text-align:center; transition:all 0.15s; font-family:var(--font-sans); }
+.mode-tab.active { background:#2563EB; color:#fff; border-color:#2563EB; }
+.panel { display:none; }
+.panel.visible { display:block; }
+.canvas-area { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:22px; gap:16px; background:var(--color-background-secondary); overflow:auto; }
+#previewCanvas { border-radius:var(--border-radius-lg); border:1px solid var(--color-border-tertiary); background:#111; max-width:100%; box-shadow:0 16px 44px rgba(23,32,51,0.16); }
+.toolbar { display:flex; gap:7px; align-items:center; flex-wrap:wrap; justify-content:center; }
+.btn { font-size:12px; padding:7px 14px; border-radius:var(--border-radius-md); border:1px solid var(--color-border-secondary); background:var(--color-background-primary); color:var(--color-text-primary); cursor:pointer; display:flex; align-items:center; gap:5px; transition:background 0.15s,border-color 0.15s,transform 0.15s; font-family:var(--font-sans); font-weight:600; }
+.btn:hover { background:var(--color-background-secondary); }
+.btn.primary { background:#2563EB; color:#fff; border-color:#2563EB; }
+.btn.primary:hover { background:#1d4ed8; }
+.btn:active { transform:translateY(1px); }
+.btn:disabled { opacity:0.4; cursor:not-allowed; }
+.empty-hint { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:var(--color-text-tertiary); font-size:13px; height:min(54vh,460px); width:min(100%,720px); border-radius:var(--border-radius-lg); border:1px dashed var(--color-border-tertiary); text-align:center; background:rgba(255,255,255,0.56); }
+.empty-hint i { font-size:30px; }
+.status-bar { font-size:12px; color:var(--color-text-secondary); text-align:center; min-height:17px; }
+.hint-text { font-size:11px; color:var(--color-text-tertiary); margin-bottom:9px; margin-top:-5px; line-height:1.5; }
+.site-footer { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px; padding:12px 18px; border-top:1px solid var(--color-border-tertiary); background:var(--color-background-elevated); color:var(--color-text-tertiary); font-size:12px; }
+.site-footer a { color:#2563eb; text-decoration:none; font-weight:600; }
+.site-footer a:hover { text-decoration:underline; }
+@media (max-width: 760px) {
+  .app { flex-direction:column; }
+  .sidebar { width:100%; min-width:0; max-height:none; border-right:0; border-bottom:1px solid var(--color-border-tertiary); }
+  .canvas-area { padding:16px; }
+  .site-footer { justify-content:flex-start; }
+}
+</style>
+
+<h2 class="sr-only">时间切片照片合成工具：圆形扇形与横向线性两种模式，线性模式按 M 等分第 N 块取样</h2>
+<input type="file" id="fileInput" multiple accept="image/*" style="display:none">
+
+<div class="app">
+  <div class="sidebar">
+    <div class="section">
+      <div class="section-title">照片素材</div>
+      <div class="upload-zone" id="uploadZone">
+        <i class="ti ti-photo-up" aria-hidden="true"></i>
+        点击或拖拽上传照片<br>
+        <span style="font-size:11px;opacity:0.7">JPG / PNG / WEBP，按文件名排序</span>
+      </div>
+      <div class="photo-list" id="photoList"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">切片模式</div>
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="tabRadial" aria-pressed="true">
+          <i class="ti ti-circle-half" aria-hidden="true"></i> 圆形/扇形
+        </button>
+        <button class="mode-tab" id="tabLinear" aria-pressed="false">
+          <i class="ti ti-layout-columns" aria-hidden="true"></i> 横向线性
+        </button>
+      </div>
+
+      <div class="panel visible" id="panelRadial">
+        <div class="param-row">
+          <label>输出尺寸</label>
+          <select id="sizeSelectR">
+            <option value="1920x1080" selected>1920 × 1080</option>
+            <option value="2560x1440">2560 × 1440</option>
+            <option value="3840x2160">3840 × 2160</option>
+            <option value="1200x1200">1200 × 1200</option>
+            <option value="2000x2000">2000 × 2000</option>
+            <option value="4000x4000">4000 × 4000</option>
+          </select>
+        </div>
+        <div class="param-row">
+          <label>取样算法</label>
+          <select id="modeSelectR">
+            <option value="fan" selected>扇形整图拼接</option>
+            <option value="polar">极坐标径向重采样</option>
+          </select>
+        </div>
+        <div class="param-row">
+          <label>排列顺序</label>
+          <select id="sortOrderR">
+            <option value="name-asc">文件名升序</option>
+            <option value="name-desc">文件名降序</option>
+            <option value="list">当前列表顺序</option>
+            <option value="list-reverse">当前列表反转</option>
+            <option value="latest-center">最新居中展开</option>
+            <option value="earliest-center">最早居中展开</option>
+          </select>
+        </div>
+        <div class="param-row">
+          <label>覆盖角度</label>
+          <input type="range" id="coverAngle" min="30" max="360" step="10" value="360">
+          <span class="param-val" id="coverAngleVal">360°</span>
+        </div>
+        <div class="param-row">
+          <label>起始方向</label>
+          <input type="range" id="startAngle" min="0" max="355" step="5" value="270">
+          <span class="param-val" id="startAngleVal">12点</span>
+        </div>
+        <div class="param-row">
+          <label>内径比例</label>
+          <input type="range" id="innerRadius" min="0" max="60" step="1" value="0">
+          <span class="param-val" id="innerRadiusVal">0%</span>
+        </div>
+        <div class="param-row">
+          <label>外径比例</label>
+          <input type="range" id="outerRadius" min="30" max="100" step="1" value="90">
+          <span class="param-val" id="outerRadiusVal">90%</span>
+        </div>
+        <div class="param-row">
+          <label>扇形中心 X</label>
+          <input type="range" id="sampleX" min="0" max="100" step="1" value="50">
+          <span class="param-val" id="sampleXVal">50%</span>
+        </div>
+        <div class="param-row">
+          <label>扇形中心 Y</label>
+          <input type="range" id="sampleY" min="0" max="100" step="1" value="54">
+          <span class="param-val" id="sampleYVal">54%</span>
+        </div>
+        <div class="param-row">
+          <label>边缘羽化</label>
+          <input type="range" id="featherR" min="0" max="15" step="1" value="3">
+          <span class="param-val" id="featherRVal">3°</span>
+        </div>
+        <div class="toggle-row">
+          <label>显示分隔线</label>
+          <button class="toggle" id="toggleDividerR" aria-label="切换分隔线"></button>
+        </div>
+        <div class="param-row" id="dividerRowR" style="display:none">
+          <label>分隔线</label>
+          <input type="color" id="dividerColorR" value="#ffffff" style="width:26px;height:26px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);padding:2px;cursor:pointer;background:none;">
+          <input type="range" id="dividerWidthR" min="1" max="8" step="1" value="2" style="flex:1">
+          <span class="param-val" id="dividerWidthRVal">2px</span>
+        </div>
+        <div class="toggle-row">
+          <label>圆形遮罩</label>
+          <button class="toggle" id="toggleMaskR" aria-label="切换圆形遮罩"></button>
+        </div>
+        <div class="color-row">
+          <label>背景颜色</label>
+          <input type="color" id="bgColorR" value="#111111">
+        </div>
+        <div class="toggle-row">
+          <label>序号标注</label>
+          <button class="toggle" id="toggleLabelR" aria-label="切换序号标注"></button>
+        </div>
+      </div>
+
+      <div class="panel" id="panelLinear">
+        <div class="param-row">
+          <label>输出宽度</label>
+          <select id="widthSelectL">
+            <option value="1600">1600px</option>
+            <option value="2400">2400px</option>
+            <option value="3600">3600px</option>
+            <option value="4000">4000px</option>
+            <option value="6000" selected>6000px</option>
+          </select>
+        </div>
+        <div class="param-row">
+          <label>输出高度</label>
+          <select id="heightSelectL">
+            <option value="600">600px</option>
+            <option value="900">900px</option>
+            <option value="1200">1200px</option>
+            <option value="2000">2000px</option>
+            <option value="4000" selected>4000px</option>
+          </select>
+        </div>
+        <div class="param-row">
+          <label>切片方向</label>
+          <select id="directionL">
+            <option value="h">横向（竖条拼接）</option>
+            <option value="v">纵向（横条拼接）</option>
+          </select>
+        </div>
+        <div class="param-row">
+          <label>排列顺序</label>
+          <select id="sortOrderL">
+            <option value="name-asc">文件名升序</option>
+            <option value="name-desc">文件名降序</option>
+            <option value="list">当前列表顺序</option>
+            <option value="list-reverse">当前列表反转</option>
+            <option value="latest-center">最新居中展开</option>
+            <option value="earliest-center">最早居中展开</option>
+          </select>
+        </div>
+        <p class="hint-text">
+          第 N 张照片取其自身宽/高的 M 等分中的第 N 块区域，M 为照片总数。
+        </p>
+        <div class="param-row">
+          <label>取样偏移</label>
+          <input type="range" id="sampleOffsetL" min="-50" max="50" step="1" value="0">
+          <span class="param-val" id="sampleOffsetLVal">0%</span>
+        </div>
+        <p class="hint-text" style="margin-top:-5px">在 M 等分第 N 块基础上，整体平移取样位置</p>
+        <div class="param-row">
+          <label>边缘羽化</label>
+          <input type="range" id="featherL" min="0" max="60" step="1" value="0">
+          <span class="param-val" id="featherLVal">0px</span>
+        </div>
+        <div class="toggle-row">
+          <label>显示分隔线</label>
+          <button class="toggle" id="toggleDividerL" aria-label="切换分隔线"></button>
+        </div>
+        <div class="param-row" id="dividerRowL" style="display:none">
+          <label>分隔线</label>
+          <input type="color" id="dividerColorL" value="#ffffff" style="width:26px;height:26px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);padding:2px;cursor:pointer;background:none;">
+          <input type="range" id="dividerWidthL" min="1" max="8" step="1" value="1" style="flex:1">
+          <span class="param-val" id="dividerWidthLVal">1px</span>
+        </div>
+        <div class="color-row">
+          <label>背景颜色</label>
+          <input type="color" id="bgColorL" value="#111111">
+        </div>
+        <div class="toggle-row">
+          <label>序号标注</label>
+          <button class="toggle" id="toggleLabelL" aria-label="切换序号标注"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-area">
+    <div class="toolbar">
+      <button class="btn primary" id="renderBtn" disabled>
+        <i class="ti ti-refresh" aria-hidden="true"></i>渲染预览
+      </button>
+      <button class="btn" id="downloadBtn" disabled>
+        <i class="ti ti-download" aria-hidden="true"></i>下载图片
+      </button>
+    </div>
+    <div id="emptyState" class="empty-hint">
+      <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+      <span>上传照片后<br>点击"渲染预览"查看效果</span>
+    </div>
+    <canvas id="previewCanvas" style="display:none"></canvas>
+    <div class="status-bar" id="statusBar"></div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <span>时间切片照片合成工具</span>
+  <span>© 2026 SAGIMA</span>
+  <a href="https://github.com/SA-GIMA" target="_blank" rel="noopener noreferrer">GitHub: SA-GIMA</a>
+  <a href="https://www.xiaohongshu.com/user/profile/57a121165e87e70e0b1107a8?xsec_token=ABK9B1n150t68ujQIpNoqtM5XwQ6_w_UUvoVF5TGgc7Hc%3D&amp;xsec_source=pc_search" target="_blank" rel="noopener noreferrer">小红书：薄荷糖SAGIMA</a>
+</footer>
+
+<script>
+const photos = [];
+let currentMode = 'radial';
+
+const fileInput = document.getElementById('fileInput');
+const uploadZone = document.getElementById('uploadZone');
+const photoList = document.getElementById('photoList');
+const renderBtn = document.getElementById('renderBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const canvas = document.getElementById('previewCanvas');
+const emptyState = document.getElementById('emptyState');
+const statusBar = document.getElementById('statusBar');
+const ctx = canvas.getContext('2d');
+
+function setStatus(msg) { statusBar.textContent = msg; }
+
+function slider(id, suffix) {
+  const el = document.getElementById(id);
+  const out = document.getElementById(id + 'Val');
+  if (!el || !out) return;
+  const update = () => {
+    const v = parseFloat(el.value);
+    if (suffix === 'clock') out.textContent = clockLabel(v);
+    else out.textContent = Math.round(v) + suffix;
+  };
+  el.addEventListener('input', update);
+  update();
+}
+function clockLabel(d) {
+  if (d === 270) return '12点';
+  if (d === 0 || d === 360) return '3点';
+  if (d === 90) return '6点';
+  if (d === 180) return '9点';
+  return Math.round(d) + '°';
+}
+slider('coverAngle','°'); slider('startAngle','clock');
+slider('innerRadius','%'); slider('outerRadius','%');
+slider('sampleX','%'); slider('sampleY','%'); slider('featherR','°');
+slider('dividerWidthR','px');
+slider('sampleOffsetL','%'); slider('featherL','px'); slider('dividerWidthL','px');
+
+function mkToggle(id, cb) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.addEventListener('click', () => { btn.classList.toggle('on'); if (cb) cb(btn.classList.contains('on')); });
+}
+mkToggle('toggleDividerR', on => { document.getElementById('dividerRowR').style.display = on ? 'flex':'none'; });
+mkToggle('toggleMaskR');
+mkToggle('toggleLabelR');
+mkToggle('toggleDividerL', on => { document.getElementById('dividerRowL').style.display = on ? 'flex':'none'; });
+mkToggle('toggleLabelL');
+
+document.getElementById('tabRadial').addEventListener('click', () => switchMode('radial'));
+document.getElementById('tabLinear').addEventListener('click', () => switchMode('linear'));
+
+function switchMode(m) {
+  currentMode = m;
+  document.getElementById('tabRadial').classList.toggle('active', m==='radial');
+  document.getElementById('tabLinear').classList.toggle('active', m==='linear');
+  document.getElementById('tabRadial').setAttribute('aria-pressed', m==='radial');
+  document.getElementById('tabLinear').setAttribute('aria-pressed', m==='linear');
+  document.getElementById('panelRadial').classList.toggle('visible', m==='radial');
+  document.getElementById('panelLinear').classList.toggle('visible', m==='linear');
+  if (!downloadBtn.disabled) setStatus('切换模式后请重新渲染');
+}
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.style.background='var(--color-background-secondary)'; });
+uploadZone.addEventListener('dragleave', () => uploadZone.style.background='');
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.style.background='';
+  handleFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
+});
+fileInput.addEventListener('change', () => { handleFiles(Array.from(fileInput.files)); fileInput.value=''; });
+
+function handleFiles(files) {
+  files.sort((a,b) => compareName(a.name, b.name));
+  let loaded = 0;
+  files.forEach(file => {
+    const img = new Image();
+    img.onload = () => {
+      photos.push({ img, name: file.name });
+      loaded++;
+      if (loaded === files.length) { renderPhotoList(); renderBtn.disabled = false; setStatus(`已加载 ${photos.length} 张照片`); }
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function renderPhotoList() {
+  photoList.innerHTML = '';
+  photos.forEach((p,i) => {
+    const div = document.createElement('div');
+    div.className = 'photo-item';
+    div.innerHTML = `<span class="idx">${i+1}</span><span class="name">${p.name}</span><button class="del" data-i="${i}" aria-label="删除"><i class="ti ti-x"></i></button>`;
+    div.querySelector('.del').addEventListener('click', () => {
+      photos.splice(i, 1); renderPhotoList();
+      if (!photos.length) { renderBtn.disabled = true; downloadBtn.disabled = true; }
+      setStatus(`剩余 ${photos.length} 张照片`);
+    });
+    photoList.appendChild(div);
+  });
+}
+
+renderBtn.addEventListener('click', () => { if (photos.length) doRender(); });
+
+function doRender() {
+  setStatus('渲染中…'); renderBtn.disabled = true;
+  setTimeout(() => {
+    if (currentMode === 'radial') renderRadialMode();
+    else renderLinearMode();
+    renderBtn.disabled = false;
+    downloadBtn.disabled = false;
+  }, 30);
+}
+
+function hexRgb(hex) {
+  return { r:parseInt(hex.slice(1,3),16), g:parseInt(hex.slice(3,5),16), b:parseInt(hex.slice(5,7),16) };
+}
+
+function compareName(a, b) {
+  return a.localeCompare(b, undefined, { numeric:true, sensitivity:'base' });
+}
+
+function parseSizeValue(value) {
+  const parts = String(value).split('x').map(v => parseInt(v, 10));
+  if (parts.length === 2 && parts.every(Number.isFinite)) return { W:parts[0], H:parts[1] };
+  const sz = parseInt(value, 10);
+  return { W:sz, H:sz };
+}
+
+function normalizeAngle(rad) {
+  const tau = Math.PI * 2;
+  rad %= tau;
+  return rad < 0 ? rad + tau : rad;
+}
+
+function smooth01(t) {
+  const v = Math.max(0, Math.min(1, t));
+  return v * v * (3 - 2 * v);
+}
+
+function mixColor(a, b, t) {
+  return {
+    r:a.r + (b.r - a.r) * t,
+    g:a.g + (b.g - a.g) * t,
+    b:a.b + (b.b - a.b) * t
+  };
+}
+
+function buildImageBuffers(list) {
+  return list.map(ph => {
+    const oc = document.createElement('canvas');
+    oc.width = ph.img.naturalWidth;
+    oc.height = ph.img.naturalHeight;
+    const c2 = oc.getContext('2d');
+    c2.drawImage(ph.img, 0, 0);
+    return { d:c2.getImageData(0, 0, oc.width, oc.height).data, w:oc.width, h:oc.height };
+  });
+}
+
+function centerWeightedOrder(list, centerIndex) {
+  const source = list.map((item, index) => ({ item, index }));
+  const center = source.findIndex(entry => entry.index === centerIndex);
+  const orderedFromCenter = [
+    source[center],
+    ...source.slice(0, center).reverse(),
+    ...source.slice(center + 1)
+  ].filter(Boolean);
+  const result = new Array(list.length);
+  const mid = Math.floor((list.length - 1) / 2);
+  const positions = [mid];
+  for (let step = 1; positions.length < list.length; step++) {
+    if (mid + step < list.length) positions.push(mid + step);
+    if (mid - step >= 0) positions.push(mid - step);
+  }
+  orderedFromCenter.forEach((entry, i) => { result[positions[i]] = entry.item; });
+  return result;
+}
+
+function sortPhotos(order) {
+  const current = [...photos];
+  const byName = [...photos].sort((a, b) => compareName(a.name, b.name));
+  if (order === 'name-desc') return [...byName].reverse();
+  if (order === 'list') return current;
+  if (order === 'list-reverse' || order === 'reverse') return current.reverse();
+  if (order === 'latest-center' || order === 'center-out') return centerWeightedOrder(byName, byName.length - 1);
+  if (order === 'earliest-center') return centerWeightedOrder(byName, 0);
+  return byName;
+}
+
+function coverSample(buffer, x, y, W, H) {
+  const scale = Math.max(W / buffer.w, H / buffer.h);
+  const drawW = buffer.w * scale;
+  const drawH = buffer.h * scale;
+  const sx = Math.max(0, Math.min(Math.round((x - (W - drawW) / 2) / scale), buffer.w - 1));
+  const sy = Math.max(0, Math.min(Math.round((y - (H - drawH) / 2) / scale), buffer.h - 1));
+  const p = (sy * buffer.w + sx) * 4;
+  return { r:buffer.d[p], g:buffer.d[p + 1], b:buffer.d[p + 2] };
+}
+
+function sampleBuffer(buffer, sx, sy, fallback) {
+  if (sx < 0 || sy < 0 || sx > buffer.w - 1 || sy > buffer.h - 1) return fallback;
+  const x0 = Math.floor(sx);
+  const y0 = Math.floor(sy);
+  const x1 = Math.min(x0 + 1, buffer.w - 1);
+  const y1 = Math.min(y0 + 1, buffer.h - 1);
+  const tx = sx - x0;
+  const ty = sy - y0;
+  const p00 = (y0 * buffer.w + x0) * 4;
+  const p10 = (y0 * buffer.w + x1) * 4;
+  const p01 = (y1 * buffer.w + x0) * 4;
+  const p11 = (y1 * buffer.w + x1) * 4;
+  const top = {
+    r:buffer.d[p00] + (buffer.d[p10] - buffer.d[p00]) * tx,
+    g:buffer.d[p00 + 1] + (buffer.d[p10 + 1] - buffer.d[p00 + 1]) * tx,
+    b:buffer.d[p00 + 2] + (buffer.d[p10 + 2] - buffer.d[p00 + 2]) * tx
+  };
+  const bottom = {
+    r:buffer.d[p01] + (buffer.d[p11] - buffer.d[p01]) * tx,
+    g:buffer.d[p01 + 1] + (buffer.d[p11 + 1] - buffer.d[p01 + 1]) * tx,
+    b:buffer.d[p01 + 2] + (buffer.d[p11 + 2] - buffer.d[p01 + 2]) * tx
+  };
+  return mixColor(top, bottom, ty);
+}
+
+function rayLimitToRect(cx, cy, angle, W, H) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const limits = [];
+  if (cos > 1e-6) limits.push((W - 1 - cx) / cos);
+  else if (cos < -1e-6) limits.push((0 - cx) / cos);
+  if (sin > 1e-6) limits.push((H - 1 - cy) / sin);
+  else if (sin < -1e-6) limits.push((0 - cy) / sin);
+  return Math.max(0, Math.min(...limits.filter(v => v >= 0)));
+}
+
+function polarSample(buffer, angle, radiusT, centerX, centerY, fallback) {
+  const sx0 = (buffer.w - 1) * centerX;
+  const sy0 = (buffer.h - 1) * centerY;
+  const limit = rayLimitToRect(sx0, sy0, angle, buffer.w, buffer.h);
+  const radius = limit * Math.max(0, Math.min(1, radiusT));
+  return sampleBuffer(
+    buffer,
+    sx0 + Math.cos(angle) * radius,
+    sy0 + Math.sin(angle) * radius,
+    fallback
+  );
+}
+
+function renderRadialMode() {
+  const n = photos.length;
+  const sortOrder = document.getElementById('sortOrderR').value;
+  const sortedPhotos = sortPhotos(sortOrder);
+  const { W, H } = parseSizeValue(document.getElementById('sizeSelectR').value);
+  const mode = document.getElementById('modeSelectR').value;
+  const coverAngle = parseFloat(document.getElementById('coverAngle').value);
+  const startDeg   = parseFloat(document.getElementById('startAngle').value);
+  const innerR     = parseFloat(document.getElementById('innerRadius').value) / 100;
+  const outerR     = parseFloat(document.getElementById('outerRadius').value) / 100;
+  const centerX    = parseFloat(document.getElementById('sampleX').value) / 100;
+  const centerY    = parseFloat(document.getElementById('sampleY').value) / 100;
+  const featherDeg = parseFloat(document.getElementById('featherR').value);
+  const showDiv    = document.getElementById('toggleDividerR').classList.contains('on');
+  const divColor   = document.getElementById('dividerColorR').value;
+  const divW       = parseInt(document.getElementById('dividerWidthR').value);
+  const useMask    = document.getElementById('toggleMaskR').classList.contains('on');
+  const bgColor    = document.getElementById('bgColorR').value;
+  const showLabel  = document.getElementById('toggleLabelR').classList.contains('on');
+
+  const MAX_PREVIEW_W = 900;
+  const MAX_PREVIEW_H = 620;
+  const displayScale = Math.min(1, MAX_PREVIEW_W / W, MAX_PREVIEW_H / H);
+  canvas.width = W; canvas.height = H;
+  canvas.style.width = Math.round(W * displayScale) + 'px';
+  canvas.style.height = Math.round(H * displayScale) + 'px';
+
+  const cx = W * centerX;
+  const cy = H * centerY;
+  const rayR = Math.max(
+    Math.hypot(cx, cy),
+    Math.hypot(W - cx, cy),
+    Math.hypot(cx, H - cy),
+    Math.hypot(W - cx, H - cy)
+  );
+  const circleR = Math.min(W, H) * 0.5 * outerR;
+  const maxR = useMask ? circleR : rayR * outerR;
+  const minR = maxR * innerR;
+  const startRad = startDeg * Math.PI / 180;
+  const coverRad = coverAngle * Math.PI / 180;
+  const sliceRad = coverRad / n;
+  const featherRad = Math.min(featherDeg * Math.PI / 180, sliceRad * 0.45);
+  const fullCircle = coverAngle >= 359.999;
+  const useRadialBounds = useMask || innerR > 0 || outerR < 0.999;
+  const bg = hexRgb(bgColor);
+  const buffers = buildImageBuffers(sortedPhotos);
+
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, W, H);
+
+  if (mode === 'fan') {
+    const idata = ctx.getImageData(0,0,W,H);
+    const data = idata.data;
+    for (let y=0; y<H; y++) {
+      for (let x=0; x<W; x++) {
+        const dx=x-cx, dy=y-cy;
+        const r = Math.sqrt(dx*dx+dy*dy);
+        if (useRadialBounds && (r<minR || r>maxR)) continue;
+        const angle = normalizeAngle(Math.atan2(dy,dx) - startRad);
+        if (!fullCircle && angle>coverRad) continue;
+        const si = Math.min(Math.floor(angle/sliceRad), n-1);
+        const localA = angle - si*sliceRad;
+        let color = coverSample(buffers[si], x, y, W, H);
+
+        if (featherRad > 0) {
+          const leftDist = localA;
+          const rightDist = sliceRad - localA;
+          if (leftDist < featherRad) {
+            const ni = si > 0 ? si - 1 : (fullCircle ? n - 1 : -1);
+            const nextColor = ni >= 0 ? coverSample(buffers[ni], x, y, W, H) : bg;
+            color = mixColor(nextColor, color, smooth01(leftDist / featherRad));
+          } else if (rightDist < featherRad) {
+            const ni = si < n - 1 ? si + 1 : (fullCircle ? 0 : -1);
+            const nextColor = ni >= 0 ? coverSample(buffers[ni], x, y, W, H) : bg;
+            color = mixColor(nextColor, color, smooth01(rightDist / featherRad));
+          }
+        }
+
+        const pi2 = (y*W+x)*4;
+        data[pi2]   = Math.round(color.r);
+        data[pi2+1] = Math.round(color.g);
+        data[pi2+2] = Math.round(color.b);
+        data[pi2+3] = 255;
+      }
+    }
+    ctx.putImageData(idata, 0, 0);
+  } else {
+    const idata = ctx.getImageData(0,0,W,H);
+    const data = idata.data;
+    for (let y=0; y<H; y++) {
+      for (let x=0; x<W; x++) {
+        const dx=x-cx, dy=y-cy;
+        const r = Math.sqrt(dx*dx+dy*dy);
+        if (useRadialBounds && (r<minR || r>maxR)) continue;
+        const angle = normalizeAngle(Math.atan2(dy,dx) - startRad);
+        if (!fullCircle && angle>coverRad) continue;
+        const si = Math.min(Math.floor(angle/sliceRad), n-1);
+        const t = maxR === minR ? 0 : (r - minR) / (maxR - minR);
+        const sourceAngle = startRad + angle;
+        let color = polarSample(buffers[si], sourceAngle, t, centerX, centerY, bg);
+
+        if (featherRad > 0) {
+          const localA = angle - si*sliceRad;
+          const leftDist = localA;
+          const rightDist = sliceRad - localA;
+          if (leftDist < featherRad) {
+            const ni = si > 0 ? si - 1 : (fullCircle ? n - 1 : -1);
+            const nextColor = ni >= 0 ? polarSample(buffers[ni], sourceAngle, t, centerX, centerY, bg) : bg;
+            color = mixColor(nextColor, color, smooth01(leftDist / featherRad));
+          } else if (rightDist < featherRad) {
+            const ni = si < n - 1 ? si + 1 : (fullCircle ? 0 : -1);
+            const nextColor = ni >= 0 ? polarSample(buffers[ni], sourceAngle, t, centerX, centerY, bg) : bg;
+            color = mixColor(nextColor, color, smooth01(rightDist / featherRad));
+          }
+        }
+
+        const pi2 = (y*W+x)*4;
+        data[pi2]   = Math.round(color.r);
+        data[pi2+1] = Math.round(color.g);
+        data[pi2+2] = Math.round(color.b);
+        data[pi2+3] = 255;
+      }
+    }
+    ctx.putImageData(idata, 0, 0);
+  }
+
+  if (showDiv) {
+    ctx.strokeStyle=divColor; ctx.lineWidth=divW;
+    for (let i=0; i<=n; i++) {
+      const a=startRad+i*sliceRad;
+      ctx.beginPath(); ctx.moveTo(cx+minR*Math.cos(a),cy+minR*Math.sin(a)); ctx.lineTo(cx+maxR*Math.cos(a),cy+maxR*Math.sin(a)); ctx.stroke();
+    }
+  }
+  if (showLabel) {
+    ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    const fs=Math.max(10,Math.round(Math.min(W,H)*0.016));
+    ctx.font=`${fs}px sans-serif`;
+    for (let i=0;i<n;i++) { const a=startRad+(i+0.5)*sliceRad; ctx.fillText(i+1,cx+(maxR+20)*Math.cos(a),cy+(maxR+20)*Math.sin(a)); }
+  }
+  emptyState.style.display='none'; canvas.style.display='block';
+  const label = mode === 'fan' ? '扇形切片' : '极坐标重采样';
+  setStatus(`✓ ${label}完成  ${W}×${H}px  共 ${n} 张`);
+}
+
+function renderLinearMode() {
+  const n = photos.length;
+  const W = parseInt(document.getElementById('widthSelectL').value);
+  const H = parseInt(document.getElementById('heightSelectL').value);
+  const isH = document.getElementById('directionL').value === 'h';
+  const offset = parseFloat(document.getElementById('sampleOffsetL').value) / 100;
+  const featherPx = parseInt(document.getElementById('featherL').value);
+  const showDiv = document.getElementById('toggleDividerL').classList.contains('on');
+  const divColor = document.getElementById('dividerColorL').value;
+  const divW = parseInt(document.getElementById('dividerWidthL').value);
+  const bgColor = document.getElementById('bgColorL').value;
+  const showLabel = document.getElementById('toggleLabelL').classList.contains('on');
+  const bg = hexRgb(bgColor);
+
+  const sortOrder = document.getElementById('sortOrderL').value;
+  const sortedPhotos = sortPhotos(sortOrder);
+
+  const MAX_DISPLAY_W = 560;
+  const displayW = Math.min(W, MAX_DISPLAY_W);
+  const displayH = Math.round(displayW * H / W);
+  canvas.width = W; canvas.height = H;
+  canvas.style.width = displayW+'px'; canvas.style.height = displayH+'px';
+
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, W, H);
+
+  const offs = buildImageBuffers(sortedPhotos);
+
+  const idata = ctx.getImageData(0, 0, W, H);
+  const data = idata.data;
+
+  if (isH) {
+    const stripW = W / n;
+    for (let x = 0; x < W; x++) {
+      const imgIdx = Math.min(Math.floor(x / stripW), n-1);
+      const ph = offs[imgIdx];
+      const posInStrip = x - imgIdx * stripW;
+
+      const sliceStart = (imgIdx / n) * ph.w;
+      const sliceEnd   = ((imgIdx + 1) / n) * ph.w;
+      const sliceW = sliceEnd - sliceStart;
+      const rawSrcX = sliceStart + (posInStrip / stripW) * sliceW + offset * ph.w;
+      const srcX = Math.max(0, Math.min(Math.round(rawSrcX), ph.w-1));
+
+      let alpha = 1;
+      if (featherPx > 0) {
+        const distEdge = Math.min(posInStrip, stripW - posInStrip);
+        if (distEdge < featherPx) alpha = distEdge / featherPx;
+      }
+
+      for (let y = 0; y < H; y++) {
+        const srcY = Math.max(0, Math.min(Math.round((y / H) * ph.h), ph.h-1));
+        const s = (srcY * ph.w + srcX) * 4;
+        const pi = (y * W + x) * 4;
+        data[pi]   = Math.round(ph.d[s]   * alpha + bg.r * (1-alpha));
+        data[pi+1] = Math.round(ph.d[s+1] * alpha + bg.g * (1-alpha));
+        data[pi+2] = Math.round(ph.d[s+2] * alpha + bg.b * (1-alpha));
+        data[pi+3] = 255;
+      }
+    }
+  } else {
+    const stripH = H / n;
+    for (let y = 0; y < H; y++) {
+      const imgIdx = Math.min(Math.floor(y / stripH), n-1);
+      const ph = offs[imgIdx];
+      const posInStrip = y - imgIdx * stripH;
+
+      const sliceStart = (imgIdx / n) * ph.h;
+      const sliceEnd   = ((imgIdx + 1) / n) * ph.h;
+      const sliceH = sliceEnd - sliceStart;
+      const rawSrcY = sliceStart + (posInStrip / stripH) * sliceH + offset * ph.h;
+      const srcY = Math.max(0, Math.min(Math.round(rawSrcY), ph.h-1));
+
+      let alpha = 1;
+      if (featherPx > 0) {
+        const distEdge = Math.min(posInStrip, stripH - posInStrip);
+        if (distEdge < featherPx) alpha = distEdge / featherPx;
+      }
+
+      for (let x = 0; x < W; x++) {
+        const srcX = Math.max(0, Math.min(Math.round((x / W) * ph.w), ph.w-1));
+        const s = (srcY * ph.w + srcX) * 4;
+        const pi = (y * W + x) * 4;
+        data[pi]   = Math.round(ph.d[s]   * alpha + bg.r * (1-alpha));
+        data[pi+1] = Math.round(ph.d[s+1] * alpha + bg.g * (1-alpha));
+        data[pi+2] = Math.round(ph.d[s+2] * alpha + bg.b * (1-alpha));
+        data[pi+3] = 255;
+      }
+    }
+  }
+  ctx.putImageData(idata, 0, 0);
+
+  if (showDiv) {
+    ctx.strokeStyle = divColor; ctx.lineWidth = divW;
+    for (let i = 1; i < n; i++) {
+      const pos = Math.round((i / n) * (isH ? W : H));
+      ctx.beginPath();
+      if (isH) { ctx.moveTo(pos, 0); ctx.lineTo(pos, H); }
+      else      { ctx.moveTo(0, pos); ctx.lineTo(W, pos); }
+      ctx.stroke();
+    }
+  }
+
+  if (showLabel) {
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    const fs = Math.max(10, Math.round(Math.min(W,H) * 0.018));
+    ctx.font = `${fs}px sans-serif`;
+    for (let i = 0; i < n; i++) {
+      const pos = ((i+0.5) / n) * (isH ? W : H);
+      if (isH) ctx.fillText(i+1, pos, 10);
+      else { ctx.save(); ctx.translate(12, pos); ctx.rotate(-Math.PI/2); ctx.fillText(i+1, 0, 0); ctx.restore(); }
+    }
+  }
+
+  emptyState.style.display='none'; canvas.style.display='block';
+  setStatus(`✓ 横向切片完成  ${W}×${H}px  共 ${n} 张`);
+}
+
+downloadBtn.addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = `time-slice-${currentMode}-${Date.now()}.png`;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+});
+</script>
