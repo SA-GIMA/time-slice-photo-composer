@@ -4,6 +4,10 @@
 
 项目当前是一个单文件 HTML 工具，无需安装依赖，也不需要后端服务。所有图片处理都在浏览器本地完成。
 
+## 效果样张
+
+![时间切片效果样张](./demo.jpg)
+
 ## 功能特性
 
 - 支持批量上传 JPG / PNG / WEBP 图片
@@ -116,6 +120,7 @@ frame-003.jpg
 ```text
 .
 ├── README.md
+├── demo.jpg
 └── time_slice_photo_composer.html
 ```
 
@@ -142,4 +147,3 @@ frame-003.jpg
 
 - GitHub: [SA-GIMA](https://github.com/SA-GIMA)
 - 小红书: [薄荷糖SAGIMA](https://www.xiaohongshu.com/user/profile/57a121165e87e70e0b1107a8?xsec_token=ABK9B1n150t68ujQIpNoqtM5XwQ6_w_UUvoVF5TGgc7Hc%3D&xsec_source=pc_search)
-
